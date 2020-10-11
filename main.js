@@ -1,21 +1,21 @@
-function createElement(tagName, attributes, ...children) {
-  let e = document.createElement(tagName)
-  for (const attr in attributes) {
-    e.setAttribute(attr, attributes[attr])
+import { Component, render, createElement } from "./toy-react"
+
+class MyComponent extends Component {
+  render() {
+    return (
+      <div>
+        <h1>My Component</h1>
+        {this.children}
+      </div>
+    )
   }
-  for (const child of children) {
-    if (typeof child === "string") {
-      child = document.createTextNode(child)
-    }
-    e.appendChild(child)
-  }
-  return e
 }
 
-window.a = (
-  <div id="a" class="c">
-    <div>abc</div>
-    <div></div>
-    <div></div>
-  </div>
+render(
+  <MyComponent id="a" class="c">
+    <div>abc1</div>
+    <span></span>
+    <a></a>
+  </MyComponent>,
+  document.body
 )
