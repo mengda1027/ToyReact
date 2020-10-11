@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/mengda1027/ToyReact/issues"
   },
-  "homepage": "https://github.com/mengda1027/ToyReact#readme"
+  "homepage": "https://github.com/mengda1027/ToyReact#readme",
+  "devDependencies": {
+    "webpack": "^4.0.0",
+    "webpack-cli": "^4.0.0"
+  }
 }
