@@ -8,7 +8,14 @@ class ElementWrapper {
     this.root = document.createElement(type)
   }
   setAttribute(k, v) {
-    this.root.setAttribute(k, v)
+    if (k.match(/^on([\s\S]+)/)) {
+      this.root.addEventListener(
+        RegExp.$1.replace(/^[\s\S]/, (c) => c.toLowerCase()),
+        v
+      )
+    } else {
+      this.root.setAttribute(k, v)
+    }
   }
   appendChild(component) {
     let range = document.createRange()
@@ -39,6 +46,7 @@ export class Component {
     this.children = []
     // component的root需要取出来
     this._root = null
+    this._range = null
   }
   setAttribute(k, v) {
     this.props[k] = v
@@ -47,7 +55,32 @@ export class Component {
     this.children.push(component)
   }
   [RENDER_TO_DOM](range) {
+    this._range = range
     this.render()[RENDER_TO_DOM](range)
+  }
+  rerender() {
+    this._range.deleteContents()
+    this[RENDER_TO_DOM](this._range)
+  }
+  setState(newState) {
+    // this.state 为null 或不是 Object 直接赋值
+    if (this.state === null || typeof this.state !== "object") {
+      this.state = newState
+      this.rerender()
+      return
+    }
+    // 深拷贝合并状态
+    let merge = (oldState, newState) => {
+      for (const p in newState) {
+        if (oldState[p] === null || typeof oldState[p] !== "object") {
+          oldState[p] = newState[p]
+        } else {
+          merge(oldState[p], newState[p])
+        }
+      }
+    }
+    merge(this.state, newState)
+    this.rerender()
   }
 }
 
