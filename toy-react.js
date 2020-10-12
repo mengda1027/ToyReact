@@ -14,7 +14,11 @@ class ElementWrapper {
         v
       )
     } else {
-      this.root.setAttribute(k, v)
+      if (k === "className") {
+        this.setAttribute("class", v)
+      } else {
+        this.root.setAttribute(k, v)
+      }
     }
   }
   appendChild(component) {
@@ -101,6 +105,9 @@ export function createElement(type, attributes, ...children) {
   // 遇到 child 为 数组时 (如：{this.children}), 需要递归处理，直至 TextWrapper 或 ElementWrapper
   const insertChildren = (children) => {
     for (const child of children) {
+      if (child === null) {
+        continue
+      }
       if (typeof child === "string") {
         child = new TextWrapper(child)
       }
