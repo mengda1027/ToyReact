@@ -63,8 +63,16 @@ export class Component {
     this.render()[RENDER_TO_DOM](range)
   }
   rerender() {
-    this._range.deleteContents()
-    this[RENDER_TO_DOM](this._range)
+    // 保存原range，先插入，再删除，防止触发新插入的range被删除的bug
+    let oldRange = this._range
+
+    let toolRange = document.createRange()
+    toolRange.setStart(oldRange.startContainer, oldRange.startOffset)
+    toolRange.setEnd(oldRange.startContainer, oldRange.startOffset)
+    this[RENDER_TO_DOM](toolRange)
+    // 删除操作
+    oldRange.setStart(toolRange.endContainer, toolRange.endOffset)
+    oldRange.deleteContents()
   }
   setState(newState) {
     // this.state 为null 或不是 Object 直接赋值
