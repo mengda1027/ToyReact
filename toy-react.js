@@ -18,25 +18,70 @@ export class Component {
   get vdom() {
     return this.render().vdom
   }
-  get vchildren() {
-    return this.children.map((child) => child.vdom)
-  }
   [RENDER_TO_DOM](range) {
     this._range = range
-    this.render()[RENDER_TO_DOM](range)
+    this._vdom = this.vdom // 保存旧的vdom
+    this._vdom[RENDER_TO_DOM](range)
   }
-  rerender() {
-    // 保存原range，先插入，再删除，防止触发新插入的range被删除的bug
-    let oldRange = this._range
+  update() {
+    // 判断节点是否发生变化
+    let isSameNode = (oldNode, newNode) => {
+      if (oldNode.type !== newNode.type) return false
+      for (let name in newNode.props) {
+        if (newNode.props[name] !== oldNode.props[name]) {
+          return false
+        }
+      }
+      // 旧dom属性多于新dom属性
+      if (Object.keys(oldNode.props).length > Object.keys(newNode.props).length) {
+        return false
+      }
 
-    let toolRange = document.createRange()
-    toolRange.setStart(oldRange.startContainer, oldRange.startOffset)
-    toolRange.setEnd(oldRange.startContainer, oldRange.startOffset)
-    this[RENDER_TO_DOM](toolRange)
-    // 删除操作
-    oldRange.setStart(toolRange.endContainer, toolRange.endOffset)
-    oldRange.deleteContents()
+      if (newNode.type === "#text") {
+        if (newNode.content !== oldNode.content) {
+          return false
+        }
+      }
+      return true
+    }
+    let update = (oldNode, newNode) => {
+      // 不同type ,props 则更新节点
+      // #text 的 content 不同更新节点
+      if (!isSameNode(oldNode, newNode)) {
+        newNode[RENDER_TO_DOM](oldNode._range)
+        return
+      }
+      // 比较 children
+      newNode._range = oldNode._range
+      let newChildren = newNode.vchildren
+      let oldChildren = oldNode.vchildren
+      if (!newChildren || !oldChildren) {
+        return
+      }
+      let tailRange = oldChildren[oldChildren.length - 1]._range
+
+      for (let i = 0; i < newChildren.length; i++) {
+        let newChild = newChildren[i]
+        let oldChild = oldChildren[i]
+
+        if (i < oldChildren.length) {
+          // 旧子节点数量多于新子节点数量
+          update(oldChild, newChild)
+        } else {
+          // 追加节点
+          let range = document.createRange()
+          range.setStart(tailRange.endContainer, tailRange.endOffset)
+          range.setEnd(tailRange.endContainer, tailRange.endOffset)
+          newChild[RENDER_TO_DOM](range)
+          tailRange = range
+        }
+      }
+    }
+    let vdom = this.vdom
+    update(this._vdom, vdom)
+    this._vdom = vdom
   }
+
   setState(newState) {
     // this.state 为null 或不是 Object 直接赋值
     if (this.state === null || typeof this.state !== "object") {
@@ -55,7 +100,7 @@ export class Component {
       }
     }
     merge(this.state, newState)
-    this.rerender()
+    this.update()
   }
 }
 
@@ -67,10 +112,11 @@ class ElementWrapper extends Component {
     this.type = type
   }
   get vdom() {
+    this.vchildren = this.children.map((child) => child.vdom)
     return this
   }
   [RENDER_TO_DOM](range) {
-    range.deleteContents()
+    this._range = range
     let root = document.createElement(this.type)
     // 处理 this.props
     for (let name in this.props) {
@@ -88,14 +134,17 @@ class ElementWrapper extends Component {
         }
       }
     }
+
+    if (!this.vchildren) this.vchildren = this.children.map((child) => child.vdom)
+
     // 处理 children
-    for (const child of this.children) {
+    for (const child of this.vchildren) {
       let childRange = document.createRange()
       childRange.setStart(root, root.childNodes.length)
       childRange.setEnd(root, root.childNodes.length)
       child[RENDER_TO_DOM](childRange)
     }
-    range.insertNode(root)
+    replaceContent(range, root)
   }
 }
 
@@ -103,15 +152,26 @@ class TextWrapper extends Component {
   constructor(content) {
     super(content)
     this.content = content
-    this.root = document.createTextNode(content)
   }
   get vdom() {
     return this
   }
   [RENDER_TO_DOM](range) {
-    range.deleteContents()
-    range.insertNode(this.root)
+    this._range = range
+    let root = document.createTextNode(this.content)
+    replaceContent(range, root)
   }
+}
+
+// range 删除方法
+function replaceContent(range, node) {
+  // 先插入，后删除
+  range.insertNode(node)
+  range.setStartAfter(node)
+  range.deleteContents()
+  // 校正 range
+  range.setStartBefore(node)
+  range.setEndAfter(node)
 }
 
 // plugin-transform-react-jsx 将 jsx 解析后调用 createEelment
